@@ -28,7 +28,7 @@ python app.py            # 默认端口 8001
 python app.py 8080       # 指定端口
 ```
 
-浏览器打开 http://127.0.0.1:8001
+浏览器打开 <http://127.0.0.1:8001>
 
 ## 使用
 
@@ -57,7 +57,7 @@ python app.py 8080       # 指定端口
 
 务必用小号，别用主号（有风控风险）。
 
-1. 打开 https://x.com 并登录小号
+1. 打开 <https://x.com> 并登录小号
 2. F12 → Application → Cookies → 选择 `https://x.com`
 3. 复制 `auth_token` 和 `ct0` 的 Value
 4. 填进界面的 Cookies 输入框（每行一个小号）
@@ -65,15 +65,15 @@ python app.py 8080       # 指定端口
 ## LLM 配置示例
 
 | 服务 | Base URL | 模型示例 |
-|---|---|---|
-| DeepSeek | https://api.deepseek.com/v1 | deepseek-chat |
-| OpenAI | https://api.openai.com/v1 | gpt-4o-mini |
-| 通义千问 | https://dashscope.aliyuncs.com/compatible-mode/v1 | qwen-plus |
-| Ollama 本地 | http://localhost:11434/v1 | llama3.1 |
+| --- | --- | --- |
+| DeepSeek | <https://api.deepseek.com/v1> | deepseek-chat |
+| OpenAI | <https://api.openai.com/v1> | gpt-4o-mini |
+| 通义千问 | <https://dashscope.aliyuncs.com/compatible-mode/v1> | qwen-plus |
+| Ollama 本地 | <http://localhost:11434/v1> | llama3.1 |
 
 ## 目录结构
 
-```
+```text
 twitter_profile_generator/          # 程序目录（只放代码与只读资源）
 ├── app.py              # Web 界面 + 流程编排
 ├── scraper.py          # 通用抓取引擎（含自动起始日期）
@@ -98,7 +98,7 @@ twitter_profile_generator/          # 程序目录（只放代码与只读资源
 
 > 输出按目标自动隔离：每次抓取写入 `output/<模式_目标>/`（如 `output/user_elonmusk/`、
 > `output/keyword_机器学习/`），**切换目标不会与上次数据串扰**；同目标重复运行仍走断点续跑。
-
+>
 > 隐私数据（Cookie / API Key / 账号库）与抓取数据统一存放在用户数据目录，
 > **程序目录不再产生任何数据文件**；可用环境变量 `TPG_DATA_DIR` 指定其他位置。
 > 旧版散落在程序目录的数据（`user_config.json` / `configs/` / `output/` 等）首次启动时自动迁移。
@@ -114,6 +114,7 @@ python tests/test_core.py    # 不联网，验证多预设、ACG 统计、采样
 不装 Python 的话，直接运行 `dist\推特用户画像生成器.exe`（会自动打开浏览器）。
 
 修改代码后重新打包，运行 `build_exe.bat`，产物在 `dist\`。打包要点：
+
 - 入口是 `launcher.py`（启动服务 + 自动开浏览器 + 异常写入「软件错误.log」，日志在用户数据目录）
 - `paths.py` 区分包内只读资源（static）和用户数据目录（`~/TwitterProfileGenerator/`）
 - PyInstaller 需要 `--collect-all twscrape --collect-all fake_useragent`（已写进 build_exe.bat）
