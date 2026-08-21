@@ -1,0 +1,26 @@
+# 依赖与虚拟环境
+.venv/
+venv/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 打包产物
+build/
+dist/
+
+# 运行时数据已统一迁移到用户数据目录（~/TwitterProfileGenerator，
+# 可用环境变量 TPG_DATA_DIR 覆盖），项目目录不再存放任何隐私/数据文件。
+# 以下为旧版遗留文件的兜底忽略（迁移前若被误提交可防再次入库）：
+output/
+configs/
+accounts.db
+progress.json
+user_config.json
+config.json
+运行锁.lock
+*.log
+
+# 测试临时文件
+.pytest_cache/

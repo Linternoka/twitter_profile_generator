@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>推特用户画像生成器</title>
+<style>
+/* ============ 黑白简约 · 暗色版 v2 ============ */
+:root{
+  --bg:#0a0a0b;
+  --bg-soft:#111114;
+  --bg-track:#1a1a1e;
+  --fg:#ececf0;
+  --fg-dim:#a2a2ab;
+  --fg-faint:#71717a;
+  --line:#28282e;
+  --line-soft:#1c1c21;
+  --strong:#ffffff;
+  --accent:#5aa6f7;              /* 克制强调色（仅状态/进度/交互） */
+  --accent-soft:rgba(90,166,247,.12);
+  --danger:#ff9b9b;
+  --radius:6px;
+  --scheme:dark;
+  --t:.18s cubic-bezier(.4,0,.2,1);
+}
+*{box-sizing:border-box}
+html{color-scheme:var(--scheme,dark)}
+body{margin:0;padding:0;color:var(--fg);
+background:radial-gradient(1200px 620px at 50% -220px,#15151a 0%,transparent 60%),var(--bg);
+font-family:"Helvetica Neue","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+::selection{background:var(--accent-soft);color:var(--strong)}
+.wrap{max-width:980px;margin:0 auto;padding:60px 30px 96px}
+
+/* 滚动条 */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:var(--fg-faint)}
+::-webkit-scrollbar-track{background:transparent}
+
+/* 头部 */
+.masthead{padding:8px 0 26px;border-bottom:1px solid var(--line);margin-bottom:46px}
+.masthead h1{margin:0;font-size:28px;font-weight:800;letter-spacing:.4px;line-height:1.2}
+.masthead .sub{margin:8px 0 0;color:var(--fg-dim);font-size:13px;letter-spacing:.3px}
+.masthead .status-line{margin-top:18px;display:flex;align-items:center;gap:12px}
+
+/* 徽章 */
+.badge{display:inline-flex;align-items:center;gap:8px;padding:5px 16px;font-size:11px;
+letter-spacing:1.5px;border:1px solid var(--line);text-transform:uppercase;color:var(--fg-dim);
+border-radius:999px;transition:border-color var(--t),color var(--t),background var(--t)}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--fg-faint);transition:background var(--t)}
+.badge.running{color:var(--strong);border-color:rgba(90,166,247,.45);background:var(--accent-soft)}
+.badge.running::before{background:var(--accent);animation:pulse 1.6s ease-in-out infinite}
+.badge.done{color:#000;background:var(--strong);border-color:var(--strong)}
+.badge.done::before{background:#000}
+.badge.error{color:var(--danger);border-color:rgba(255,155,155,.45)}
+.badge.error::before{background:var(--danger)}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+.stage{font-size:12px;color:var(--fg-dim);letter-spacing:.5px}
+
+/* 区块 */
+section{margin-bottom:52px}
+.sec-title{font-size:12px;font-weight:800;letter-spacing:2.5px;color:var(--fg);
+text-transform:uppercase;margin:0 0 22px;display:flex;align-items:center;gap:12px}
+.sec-title::after{content:"";flex:1;height:1px;
+background:linear-gradient(90deg,var(--line),transparent)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:30px}
+
+/* 表单 */
+label{display:block;font-size:11px;font-weight:600;letter-spacing:1.2px;color:var(--fg-dim);
+text-transform:uppercase;margin:20px 0 8px}
+input,select,textarea{width:100%;background:transparent;color:var(--fg);
+border:none;border-bottom:1px solid var(--line);padding:9px 0;font-size:14px;
+outline:none;font-family:inherit;transition:border-color var(--t),background var(--t)}
+input:focus,textarea:focus,select:focus{border-bottom-color:var(--accent);
+background:linear-gradient(180deg,transparent,rgba(90,166,247,.03))}
+textarea{resize:vertical;min-height:112px;line-height:1.7;
+font-family:ui-monospace,Consolas,monospace;font-size:12.5px;
+border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+textarea:focus{border-color:var(--accent)}
+select{cursor:pointer;color-scheme:var(--scheme,dark);padding:10px 0}
+option{background:var(--bg);color:var(--fg)}
+.hint{font-size:11px;color:var(--fg-faint);margin-top:8px;line-height:1.7}
+.check{display:flex;align-items:center;gap:9px;margin-top:20px;font-size:13px;color:var(--fg);cursor:pointer}
+.check input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+
+/* 按钮 */
+.actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:36px;padding-top:26px;border-top:1px solid var(--line)}
+.acts-main{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.acts-sub{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding-left:14px;border-left:1px solid var(--line-soft)}
+.acts-sub button{padding:9px 16px;font-size:12px}
+.acts-opt{display:flex;gap:16px;align-items:center;margin-left:auto;flex-wrap:wrap}
+.acts-opt .check{margin:0}
+#result_actions button{padding:9px 16px;font-size:12px}
+/* 配置分组小标题 */
+.grp{font-size:11px;font-weight:800;letter-spacing:2px;color:var(--fg-faint);text-transform:uppercase;margin:34px 0 14px;display:flex;align-items:center;gap:10px}
+.grp::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+section > .grp:first-of-type{margin-top:0}
+button{cursor:pointer;font-size:13px;letter-spacing:1px;padding:12px 28px;font-family:inherit;
+border-radius:var(--radius);
+transition:transform var(--t),background var(--t),border-color var(--t),color var(--t),box-shadow var(--t);
+-webkit-tap-highlight-color:transparent}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:active:not(:disabled){transform:translateY(1px)}
+.btn-primary{background:var(--strong);color:#000;border:1px solid var(--strong);font-weight:700}
+.btn-primary:hover{background:#dcdcdf;box-shadow:0 4px 18px rgba(255,255,255,.14)}
+.btn-ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.btn-ghost.danger:hover{border-color:var(--danger);color:var(--danger);background:transparent}
+button:disabled{opacity:.35;cursor:not-allowed}
+.chip{background:transparent;border:1px solid var(--line);color:var(--fg-dim);
+padding:5px 12px;font-size:12px;border-radius:999px;letter-spacing:.5px;cursor:pointer;
+transition:border-color var(--t),color var(--t)}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+#err{color:var(--danger);font-size:12px;margin-top:14px;letter-spacing:.3px;min-height:1em}
+#error_panel{border:1px solid rgba(255,155,155,.35);border-radius:var(--radius);padding:16px 18px;margin-top:14px;background:rgba(255,155,155,.05)}
+#error_panel .ep-head{margin-bottom:10px}
+#error_panel .ep-cat{font-size:14px;font-weight:800;color:var(--danger)}
+#error_panel .ep-guide{font-size:12.5px;line-height:1.9;color:var(--fg-dim)}
+#error_panel .ep-llm{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);font-size:12.5px;line-height:1.8;color:var(--fg);white-space:pre-wrap}
+
+/* 进度 */
+.prow{display:flex;align-items:center;gap:16px;padding:12px 2px;border-bottom:1px solid var(--line-soft)}
+.prow .k{width:88px;flex:none;font-size:11px;letter-spacing:1px;color:var(--fg-faint);text-transform:uppercase}
+.prow .v{flex:1;font-size:13px;color:var(--fg);line-height:1.6}
+.prow .n{flex:none;font-size:12px;color:var(--fg-dim);font-family:ui-monospace,Consolas,monospace}
+.prow .n.rem{color:var(--accent);font-weight:700}
+
+/* 线性流程步骤条（抓取→清洗→LLM 总结） */
+.steps{display:flex;align-items:stretch;margin:4px 0 20px;flex-wrap:wrap;gap:6px}
+.step{flex:1;min-width:150px;display:flex;flex-direction:column;align-items:center;gap:9px;
+padding:18px 12px 14px;border:1px solid var(--line-soft);border-radius:var(--radius);
+background:var(--bg-soft);transition:border-color var(--t),background var(--t),opacity var(--t)}
+.step .step-ico{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+border:1px solid var(--line);color:var(--fg-faint);background:var(--bg-track);
+transition:border-color var(--t),color var(--t),background var(--t),transform var(--t)}
+.step .step-ico svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;
+stroke-linecap:round;stroke-linejoin:round}
+.step .step-label{font-size:12px;font-weight:700;letter-spacing:1px;color:var(--fg-dim)}
+.step .step-state{font-size:11px;letter-spacing:.5px;color:var(--fg-faint);min-height:1.2em}
+.step.wait .step-ico{color:var(--fg-faint)}
+.step.active{border-color:rgba(90,166,247,.5);background:var(--accent-soft)}
+.step.active .step-ico{border-color:var(--accent);color:var(--accent);transform:scale(1.08)}
+.step.active .step-state{color:var(--accent);animation:pulse 1.6s ease-in-out infinite}
+.step.done{border-color:var(--line)}
+.step.done .step-ico{border-color:var(--strong);color:#000;background:var(--strong)}
+.step.done .step-state{color:var(--fg-dim)}
+.step.error{border-color:rgba(255,155,155,.55)}
+.step.error .step-ico{border-color:var(--danger);color:var(--danger)}
+.step.error .step-state{color:var(--danger)}
+.step.skip{opacity:.4}
+.step-arrow{display:flex;align-items:center;color:var(--fg-faint);font-size:18px;padding:0 2px}
+/* 整体进度图表 */
+.overall{display:flex;align-items:center;gap:16px;margin:0 0 16px}
+.overall .track{flex:1;height:8px;margin-top:0}
+.overall .track>i{background:linear-gradient(90deg,var(--accent),var(--strong))}
+.overall .pct{font-family:ui-monospace,Consolas,monospace;font-size:22px;font-weight:800;
+color:var(--strong);min-width:56px;text-align:right;letter-spacing:-.5px}
+.overall .pct.done{color:#000;background:var(--strong);border-radius:var(--radius);padding:2px 8px}
+#progress_detail details summary{font-size:12px}
+/* 等待横幅（限流/请求间隔/LLM 响应等） */
+#waiting_banner{display:flex;align-items:center;gap:10px;margin:0 0 8px;padding:11px 14px;
+border:1px solid rgba(90,166,247,.45);border-radius:var(--radius);
+background:var(--accent-soft);font-size:12.5px;color:var(--fg);letter-spacing:.3px}
+#waiting_banner .spin{width:14px;height:14px;flex:none}
+#waiting_banner .spin svg{width:100%;height:100%;display:block;animation:rot .9s linear infinite}
+#waiting_banner .spin circle{fill:none;stroke:var(--accent);stroke-width:2.6;
+stroke-linecap:round;stroke-dasharray:14 40}
+@keyframes rot{to{transform:rotate(360deg)}}
+/* 限流检测的等待指示（按钮旁内联小 spinner + 已等待秒数） */
+.rl-spin{display:inline-flex;width:12px;height:12px;margin-right:7px;vertical-align:-2px}
+.rl-spin svg{width:100%;height:100%;display:block;animation:rot .9s linear infinite}
+.rl-spin circle{fill:none;stroke:var(--accent);stroke-width:2.6;
+stroke-linecap:round;stroke-dasharray:14 40}
+.track{height:3px;background:var(--bg-track);margin-top:8px;position:relative;border-radius:999px;overflow:hidden}
+.track>i{position:absolute;left:0;top:0;height:100%;width:0;
+background:linear-gradient(90deg,var(--accent),var(--strong));
+transition:width .6s cubic-bezier(.4,0,.2,1);border-radius:999px}
+.track>i::after{content:"";position:absolute;inset:0;
+background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);
+animation:shimmer 2.4s linear infinite}
+@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+
+/* 统计 */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.stat-grid .c{background:var(--bg-soft);border:1px solid var(--line-soft);border-radius:var(--radius);
+padding:18px 16px;transition:border-color var(--t),background var(--t)}
+.stat-grid .c:hover{border-color:var(--line);background:#16161a}
+.stat-grid .k{font-size:10px;letter-spacing:1.2px;color:var(--fg-faint);text-transform:uppercase}
+.stat-grid .v{font-size:26px;font-weight:800;margin-top:8px;
+font-family:ui-monospace,Consolas,monospace;letter-spacing:-.5px}
+
+/* 画像 */
+#profile{white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:2;
+border:1px solid var(--line);border-radius:var(--radius);padding:30px;margin-top:16px;
+background:var(--bg-soft);box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
+#profile h1,#profile h2,#profile h3{font-size:15px;font-weight:800;margin:26px 0 10px;
+border-bottom:1px solid var(--line);padding-bottom:8px}
+#profile strong{color:var(--strong)}
+.muted{color:var(--fg-dim)}
+
+/* 详情/代码 */
+details{margin-top:24px;font-size:13px}
+details summary{cursor:pointer;font-weight:700;letter-spacing:.5px;transition:color var(--t)}
+details summary:hover{color:var(--accent)}
+details ol{padding-left:22px;line-height:2.1;color:var(--fg)}
+code{background:var(--bg-track);padding:2px 7px;font-size:12px;border-radius:4px}
+
+/* 事件日志 */
+#event_log{font-size:12px;line-height:2;font-family:ui-monospace,Consolas,monospace;
+color:var(--fg-dim);max-height:280px;overflow-y:auto;border:1px solid var(--line);
+border-radius:var(--radius);padding:16px 18px;background:var(--bg-soft)}
+#event_log .t{color:var(--fg-faint);margin-right:12px;opacity:.8}
+#event_log div:hover{color:var(--fg)}
+
+/* ============ 内联 SVG 图标（手工绘制） ============ */
+.ico,.ico-sm{stroke:currentColor;fill:none;stroke-width:1.7;
+stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ico{width:18px;height:18px;color:var(--accent)}
+.ico-sm{width:13px;height:13px}
+
+/* 头部品牌区 */
+.brand{display:flex;align-items:center;gap:18px}
+.brand .logo{width:46px;height:46px;flex:none;color:var(--accent);
+stroke:currentColor;fill:none;stroke-width:1.8;
+stroke-linecap:round;stroke-linejoin:round;
+filter:drop-shadow(0 0 14px rgba(90,166,247,.18))}
+.brand .logo .dot{fill:var(--accent);stroke:none}
+
+/* 按钮/手风琴中的小图标 */
+.actions button{display:inline-flex;align-items:center;justify-content:center;gap:9px}
+details summary{display:flex;align-items:center;gap:9px}
+.sec-title .ico{margin-right:3px}
+
+/* 空状态插画 */
+.empty-state{display:flex;flex-direction:column;align-items:center;gap:14px;
+padding:46px 20px;border:1px dashed var(--line);border-radius:var(--radius);
+color:var(--fg-faint);text-align:center}
+.empty-state .es{width:100%;max-width:250px;height:auto;color:var(--fg-faint);
+stroke:currentColor;fill:none;stroke-width:1.5;
+stroke-linecap:round;stroke-linejoin:round}
+.empty-state .es .f{fill:var(--bg-track);stroke:var(--line)}
+.empty-state .es .hi{stroke:var(--accent)}
+.empty-state p{margin:0;font-size:12.5px;letter-spacing:.4px;line-height:1.9}
+
+/* ============ 亮色主题（header「主题」按钮切换，localStorage 记忆） ============ */
+html[data-theme="light"]{
+  --bg:#f4f5f8;--bg-soft:#ffffff;--bg-track:#e8e9ef;
+  --fg:#1c1c24;--fg-dim:#56565f;--fg-faint:#8b8b96;
+  --line:#d8d9e0;--line-soft:#e6e7ee;--strong:#ffffff;
+  --accent:#2563eb;--accent-soft:rgba(37,99,235,.10);--danger:#d64545;
+}
+html[data-theme="light"] body{background:radial-gradient(1200px 620px at 50% -220px,#eef1f8 0%,transparent 60%),var(--bg)}
+html[data-theme="light"] .stat-grid .c:hover{background:#f1f2f7}
+html[data-theme="light"] .track>i::after{background:linear-gradient(90deg,transparent,rgba(0,0,0,.12),transparent)}
+html[data-theme="light"] #profile{box-shadow:inset 0 1px 0 rgba(0,0,0,.03)}
+
+:root{
+  --construct-red:#e63b2e;
+  --construct-blue:#2364aa;
+  --construct-yellow:#f2c84b;
+  --construct-ink:#101010;
+  --construct-paper:#f4efe5;
+  --radius:0px;
+}
+body{font-family:"Aptos Display","Bahnschrift","PingFang SC","Microsoft YaHei",sans-serif;
+background-color:var(--bg);background-image:
+linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
+linear-gradient(116deg,transparent 0 72%,rgba(230,59,46,.08) 72% 73%,transparent 73%),
+linear-gradient(24deg,transparent 0 83%,rgba(242,200,75,.08) 83% 84%,transparent 84%);
+background-size:32px 32px,32px 32px,100% 100%,100% 100%;}
+body::before{content:"";position:fixed;z-index:-1;inset:0;pointer-events:none;
+background:linear-gradient(115deg,transparent 0 48%,rgba(35,100,170,.08) 48% 49%,transparent 49% 100%);
+clip-path:polygon(70% 0,100% 0,100% 38%,83% 27%);}
+.wrap{max-width:1120px;padding:46px 34px 110px;position:relative}
+.masthead{position:relative;padding:26px 28px 24px;margin-bottom:58px;border:0;border-bottom:8px solid var(--construct-red);
+background:linear-gradient(112deg,var(--bg-soft) 0 73%,var(--construct-yellow) 73% 86%,var(--construct-blue) 86%);
+box-shadow:14px 14px 0 rgba(230,59,46,.18);overflow:hidden}
+.masthead::after{content:"01";position:absolute;right:18px;bottom:-21px;color:rgba(0,0,0,.18);
+font-family:ui-monospace,Consolas,monospace;font-size:112px;font-weight:900;line-height:1;letter-spacing:-10px}
+.brand{gap:22px;position:relative;z-index:1}
+.brand .logo{width:58px;height:58px;color:var(--construct-red);filter:none;transform:rotate(-7deg)}
+.brand .logo .dot{fill:var(--construct-blue)}
+.masthead h1{font-size:46px;line-height:1;letter-spacing:-1px;font-weight:900}
+.masthead .sub{max-width:620px;margin-top:12px;color:var(--fg-dim);font-size:12px;letter-spacing:1px}
+.masthead .status-line{position:relative;z-index:1;margin-top:24px;padding-top:14px;border-top:2px solid var(--line);gap:10px}
+.badge{border-radius:0;border-width:2px;padding:6px 12px;font-weight:800;letter-spacing:2px}
+.badge.running{border-color:var(--construct-blue);background:var(--construct-blue);color:#fff}
+.badge.running::before{background:var(--construct-yellow)}
+.badge.done{background:var(--construct-yellow);border-color:var(--construct-ink)}
+.badge.error{border-color:var(--construct-red);color:var(--construct-red)}
+.sec-title{font-size:13px;letter-spacing:3px;margin-bottom:24px;position:relative}
+.sec-title::before{content:"";width:9px;height:9px;background:var(--construct-red);transform:rotate(45deg);margin-right:2px}
+.sec-title::after{height:2px;background:linear-gradient(90deg,var(--construct-red) 0 12%,var(--line) 12% 100%)}
+section{margin-bottom:66px}
+.grp{color:var(--construct-blue);font-size:12px;letter-spacing:2.5px;border-left:6px solid var(--construct-yellow);padding-left:10px}
+.grp::after{height:2px;background:var(--line)}
+input,select{border-bottom:2px solid var(--line);padding:11px 8px;background:rgba(255,255,255,.025)}
+textarea{border:2px solid var(--line);border-radius:0;background:rgba(255,255,255,.025)}
+input:focus,textarea:focus,select:focus{border-color:var(--construct-blue);background:rgba(35,100,170,.08)}
+label{font-weight:800;color:var(--fg-dim);letter-spacing:1.6px}
+button{border-radius:0;font-weight:700;letter-spacing:1.2px}
+.btn-primary{background:var(--construct-red);border-color:var(--construct-red);color:#fff;box-shadow:6px 6px 0 rgba(230,59,46,.25)}
+.btn-primary:hover{background:#bd2e25;box-shadow:8px 8px 0 rgba(230,59,46,.28)}
+.btn-ghost{border-width:2px}
+.btn-ghost:hover{border-color:var(--construct-blue);color:var(--construct-blue);background:rgba(35,100,170,.1)}
+.btn-ghost.danger:hover{border-color:var(--construct-red);color:var(--construct-red);background:rgba(230,59,46,.08)}
+.chip{border-radius:0;border-width:2px;padding:6px 11px}
+.actions{border-top:3px solid var(--construct-ink);padding-top:28px}
+.acts-sub{border-left:3px solid var(--construct-yellow)}
+.steps{gap:12px;align-items:stretch}
+.step{min-width:170px;border:2px solid var(--line);border-radius:0;padding:20px 14px 16px;position:relative;overflow:hidden}
+.step::before{content:"";position:absolute;top:0;left:0;width:100%;height:6px;background:var(--construct-yellow)}
+.step:nth-child(3)::before{background:var(--construct-blue)}
+.step:nth-child(5)::before{background:var(--construct-red)}
+.step .step-ico{border-radius:0;border:2px solid var(--line);transform:rotate(45deg)}
+.step .step-ico svg{transform:rotate(-45deg)}
+.step.active{border-color:var(--construct-blue);background:rgba(35,100,170,.12)}
+.step.active .step-ico{border-color:var(--construct-blue);color:var(--construct-blue);transform:rotate(45deg) scale(1.08)}
+.step.done .step-ico{border-color:var(--construct-yellow);background:var(--construct-yellow)}
+.step.error{border-color:var(--construct-red)}
+.step.error .step-ico{border-color:var(--construct-red);color:var(--construct-red)}
+.step-arrow{font-weight:900;color:var(--construct-red);font-size:24px}
+.overall{margin-top:26px}
+.overall .track{height:12px;border-radius:0;border:2px solid var(--construct-ink);padding:2px;background:var(--bg-soft)}
+.overall .track>i{border-radius:0;background:var(--construct-blue)}
+.overall .pct{font-size:25px;border-left:4px solid var(--construct-red);padding-left:12px}
+.overall .pct.done{border-radius:0;background:var(--construct-yellow)}
+.prow{border-bottom:2px solid var(--line-soft);padding:14px 4px}
+.prow .k{font-weight:800;color:var(--construct-blue)}
+.track{border-radius:0}
+.track>i{border-radius:0;background:var(--construct-blue)}
+.stat-grid{gap:14px}
+.stat-grid .c{border:2px solid var(--line);border-radius:0;background:var(--bg-soft);padding:20px 18px;position:relative;overflow:hidden}
+.stat-grid .c::after{content:"";position:absolute;right:-15px;bottom:-25px;width:64px;height:64px;background:var(--construct-yellow);transform:rotate(45deg);opacity:.75}
+.stat-grid .c:nth-child(2n)::after{background:var(--construct-blue)}
+.stat-grid .c:nth-child(3n)::after{background:var(--construct-red)}
+.stat-grid .c:hover{border-color:var(--construct-red);background:var(--bg-soft);transform:translateY(-2px)}
+.stat-grid .v{position:relative;z-index:1;font-size:30px}
+#profile{border:2px solid var(--line);border-radius:0;background:var(--bg-soft);box-shadow:10px 10px 0 rgba(35,100,170,.16);padding:34px}
+#profile h1,#profile h2,#profile h3{border-bottom:3px solid var(--construct-red);padding-bottom:10px}
+#event_log{border:2px solid var(--line);border-radius:0}
+.empty-state{border:2px dashed var(--line);border-radius:0;position:relative}
+.empty-state::before,.empty-state::after{content:"";position:absolute;display:block}
+.empty-state::before{top:0;left:0;width:42px;height:6px;background:var(--construct-red)}
+.empty-state::after{right:0;bottom:0;width:42px;height:6px;background:var(--construct-blue)}
+#error_panel{border:2px solid var(--construct-red);border-radius:0}
+details summary{font-weight:800}
+code{border-radius:0;border:1px solid var(--line)}
+html[data-theme="light"] body{background-color:var(--bg);background-image:
+linear-gradient(rgba(16,16,16,.055) 1px,transparent 1px),
+linear-gradient(90deg,rgba(16,16,16,.055) 1px,transparent 1px),
+linear-gradient(116deg,transparent 0 72%,rgba(230,59,46,.08) 72% 73%,transparent 73%),
+linear-gradient(24deg,transparent 0 83%,rgba(242,200,75,.12) 83% 84%,transparent 84%)}
+html[data-theme="light"] .masthead{background:linear-gradient(112deg,#fff 0 73%,var(--construct-yellow) 73% 86%,var(--construct-blue) 86%)}
+html[data-theme="light"] .btn-primary{color:#fff}
+@media (max-width:720px){
+  .wrap{padding:24px 18px 72px}
+  .masthead{padding:22px 18px 20px;margin-bottom:42px;box-shadow:8px 8px 0 rgba(230,59,46,.18)}
+  .masthead::after{font-size:76px;right:8px;bottom:-12px}
+  .brand{gap:14px}.brand .logo{width:44px;height:44px}
+  .masthead h1{font-size:29px;letter-spacing:-.5px}.masthead .sub{font-size:11px;line-height:1.6}
+  .masthead .status-line{align-items:flex-start;flex-wrap:wrap}.masthead .status-line button{margin-left:0!important}
+  .steps{display:grid;grid-template-columns:1fr 1fr}.step{min-width:0}.step-arrow{display:none}
+  .grid{grid-template-columns:1fr;gap:12px}
+  .actions{align-items:stretch}.acts-main,.acts-sub,.acts-opt{width:100%}.acts-sub{padding-left:0;padding-top:14px;border-left:0;border-top:3px solid var(--construct-yellow)}.acts-opt{margin-left:0}
+  #profile{padding:22px;box-shadow:6px 6px 0 rgba(35,100,170,.16)}
+  .prow{gap:10px}.prow .k{width:72px}.prow .v{min-width:0;overflow-wrap:anywhere}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="8" y="9" width="32" height="29" rx="6"/>
+        <circle cx="24" cy="20.5" r="5.5"/>
+        <path d="M13.5 33.5c2.1-4.2 6.2-6.2 10.5-6.2s8.4 2 10.5 6.2"/>
+        <path d="M35.5 4.5l1.4 2.8 2.8 1.4-2.8 1.4-1.4 2.8-1.4-2.8-2.8-1.4 2.8-1.4z"/>
+        <circle class="dot" cx="38.5" cy="12.5" r="1.1"/>
+      </svg>
+      <div>
+        <h1>推特用户画像生成器</h1>
+        <p class="sub">抓取推文 → 清洗统计 → LLM 画像 · 数据被整理成可读的证据</p>
+      </div>
+    </div>
+    <div class="status-line">
+      <span id="status_badge" class="badge idle">未运行</span>
+      <span id="stage_txt" class="stage"></span>
+      <button id="btn_theme" class="btn-ghost" onclick="toggleTheme()" title="切换亮/暗主题"><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>主题</button>
+      <button id="btn_docs" class="btn-ghost" style="margin-left:auto" onclick="openDocs()"><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M16 4v3h3M8 12h8M8 16h6"/></svg>工作原理</button>
+    </div>
+  </header>
+
+  <section>
+    <h2 class="sec-title"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 12h5M13 12h7M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="11" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg>配置</h2>
+    <div class="grp">抓取设置</div>
+    <div class="grid">
+    <div>
+      <label>提取模式</label>
+      <select id="mode">
+        <option value="user">用户（归档某用户的全部推文）</option>
+        <option value="keyword">关键词 / 标签 · 搜索抓取</option>
+      </select>
+      <label>画像预设</label>
+      <select id="preset">
+        <option value="acg">ACG 从业者（剧本家/画师/声优/官方号）</option>
+        <option value="general">通用个人用户</option>
+        <option value="brand">品牌 / 企业 / 官方账号</option>
+        <option value="creator">内容创作者（VTuber/主播/博主）</option>
+        <option value="expert">专家 / 学者 / 意见领袖</option>
+      </select>
+      <div class="hint" id="preset_hint">ACG 预设侧重：身份定位、作品与创作产出、创作风格、职业活动与业界关系等。</div>
+      <label>目标对象</label>
+      <input id="target" placeholder="用户模式填用户名（如 Zn_Cien）；关键词模式填词/标签">
+      <div class="grid">
+        <div><label>起始日期（留空 = 自动）</label><input id="start_date" type="date"></div>
+        <div><label>结束日期（含当天）</label><input id="end_date" type="date"></div>
+      </div>
+      <div class="quickdates" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="chip" onclick="quickDate('1y')">近1年</button>
+        <button class="chip" onclick="quickDate('3y')">近3年</button>
+        <button class="chip" onclick="quickDate('5y')">近5年</button>
+        <button class="chip" onclick="quickDate('all')">全部</button>
+        <button class="chip" onclick="quickDate('custom')">自定义</button>
+      </div>
+      <label class="check"><input type="checkbox" id="force_recent"> 强制重抓最近推文（Pass A/C）</label>
+      <div class="hint" id="date_hint">起始日期留空自动选取：用户模式 = 账号创建月起（不早于 2010-01），关键词模式 = 2010-01-01；结束日期默认今天。也可手动指定精确范围。</div>
+      <div id="recent_row" style="display:none;margin-top:12px"></div>
+    </div>
+    <div>
+      <label>Cookies · 每行一个小号</label>
+      <textarea id="cookies" rows="6" placeholder="直接填两个值：token值 ct0值&#10;或完整格式：auth_token=xxx; ct0=yyy&#10;多账号：每行一个，可加 |proxy=http://127.0.0.1:7898"></textarea>
+      <div class="hint" id="cookie_count"></div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:4px">
+        <button id="btn_ratelimit" class="btn-ghost" onclick="checkRateLimit()"><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span id="ratelimit_txt">检测限流状态</span></button>
+        <button id="btn_check_cookies" class="btn-ghost" onclick="checkAllCookies()" title="逐个账号检查 Cookie 是否有效"><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z"/><path d="M9 9h6M9 13h6"/></svg>检查全部 Cookie</button>
+        <span id="cookie_check_result" class="hint" style="margin-top:0"></span>
+        <span id="ratelimit_result" class="hint" style="margin-top:0"></span>
+      </div>
+      <div class="hint">每行可：① 直接填「token值 ct0值」② 完整格式 auth_token=xxx; ct0=yyy ③ 整段 Cookie 头；行尾 |proxy= 指定独立 IP；# 开头为注释。</div>
+      <label>全局代理（可选）</label>
+      <input id="proxy" placeholder="如 http://127.0.0.1:7897 · 默认自动探测">
+      <label>请求间隔（秒 · 防限流）</label>
+      <input id="delay" type="number" value="2" min="0" step="0.5">
+    </div>
+  </div>
+  <div class="grp">LLM 设置</div>
+  <div class="grid" style="margin-top:8px">
+    <div>
+      <label>LLM API Base URL（OpenAI 兼容）</label>
+      <input id="llm_base_url" value="https://api.deepseek.com/v1" placeholder="https://api.deepseek.com/v1">
+      <div class="hint">OpenAI / DeepSeek / 通义 / Ollama(http://localhost:11434/v1) 等。</div>
+    </div>
+    <div>
+      <label>LLM API Key</label>
+      <input id="llm_api_key" type="password" placeholder="sk-...">
+      <label>模型名</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="llm_model" list="llm_model_list" value="deepseek-chat" placeholder="deepseek-chat / gpt-4o-mini" style="flex:1">
+        <datalist id="llm_model_list"></datalist>
+        <button id="btn_refresh_models" class="btn-ghost" onclick="refreshModels()" title="从当前 Base URL 自动拉取可用模型列表">刷新模型</button>
+        <button id="btn_test_llm" class="btn-ghost" onclick="testLLM()" title="发送一条最小请求验证 Base URL/Key/模型可用">测试</button>
+      </div>
+    </div>
+  </div>
+  <div class="grp">任务与配置</div>
+  <div class="grid" style="margin-top:8px">
+    <div>
+      <label>操作</label>
+      <select id="action">
+        <option value="full">完整流程（抓取 + 清洗 + LLM 总结）</option>
+        <option value="scrape">仅抓取（清洗统计 · 不调 LLM）</option>
+        <option value="import">导入数据（已有 CSV · 无需抓取）</option>
+        <option value="analyze">仅 LLM 总结（需已有数据）</option>
+      </select>
+      <div class="hint" id="action_hint">完整流程：抓取 → 清洗 → LLM 画像；不填 API Key 时自动跳过画像，仅生成统计与简约整理。</div>
+    </div>
+    <div>
+      <label>配置文件</label>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <select id="cfg_profile" style="flex:1">
+          <option value="default">默认 (user_config.json)</option>
+        </select>
+        <button id="btn_save_as" class="btn-ghost" onclick="saveAsConfig()" title="把当前表单另存为一个新的命名配置">另存为…</button>
+        <button id="btn_rename_cfg" class="btn-ghost" onclick="renameConfig()" title="重命名当前命名配置">重命名</button>
+        <button id="btn_del_cfg" class="btn-ghost danger" onclick="deleteConfig()" title="删除当前命名配置">删除</button>
+        <button id="btn_refresh_cfgs" class="btn-ghost" onclick="refreshConfigs()" title="重新扫描配置文件">刷新</button>
+      </div>
+      <div class="hint">切换配置自动载入对应表单；「保存配置」写入当前所选；「另存为…」用当前表单新建一套命名配置。</div>
+    </div>
+  </div>
+  <div class="grp">存储</div>
+  <div class="grid" style="margin-top:8px">
+    <div>
+      <label>输出目录（抓取数据与结果的保存位置）</label>
+      <div style="display:flex;gap:10px;align-items:flex-end">
+        <input id="output_dir" style="flex:1" placeholder="默认：数据目录/output（可直接粘贴路径后按回车）">
+        <button id="btn_pick_outdir" class="btn-ghost" onclick="pickOutputDir()">选择…</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
+        <button class="chip" onclick="openDataDir('out')">打开输出目录</button>
+        <button id="btn_reset_outdir" class="chip" onclick="resetOutputDir()">恢复默认</button>
+        <span class="hint" id="outdir_hint" style="margin-top:0"></span>
+      </div>
+      <div class="hint">选择后自动保存，下次启动自动恢复；任务运行中不可切换。</div>
+    </div>
+    <div>
+      <label>数据目录（隐私数据统一存放）</label>
+      <input id="data_dir" readonly placeholder="~/TwitterProfileGenerator">
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="chip" onclick="openDataDir('data')">打开数据目录</button>
+      </div>
+      <div class="hint">Cookie、API Key、账号库等隐私数据与抓取数据统一保存在此，与程序目录分离。</div>
+    </div>
+  </div>
+  <div id="import_row" style="display:none">
+    <label>选择要导入的 CSV 文件（可多选）</label>
+    <input type="file" id="import_files" accept=".csv" multiple>
+    <button id="btn_import" class="btn-primary" style="margin-top:10px" onclick="doImport()"><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M7 10l5 5 5-5M4 20h16"/></svg>导入并清洗</button>
+    <div class="hint">导入的 CSV 会写入当前目标的任务目录，然后自动清洗去重、生成统计与简约整理；无需 Cookie 与 API Key。</div>
+  </div>
+  <div class="actions">
+    <div class="acts-main">
+      <button id="btn_test_scrape" class="btn-ghost" onclick="testScrape()" title="抓取前先取 5 条推文验证 Cookie/代理/目标可用"><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M7 10l5 5 5-5M4 20h16"/></svg>快速测试</button>
+      <button id="btn_start" class="btn-primary" onclick="start()"><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg><span id="btn_start_txt">开始生成</span></button>
+      <button id="btn_stop" class="btn-ghost danger" onclick="stop()" disabled><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg><span id="stop_txt">停止</span></button>
+    </div>
+    <div class="acts-sub">
+      <button id="btn_save_cfg" class="btn-ghost" onclick="saveConfig()"><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h12l2 2v14H5z"/><path d="M8 4v5h8V4M8 20v-6h8v6"/></svg>保存配置</button>
+      <button id="btn_clear_cfg" class="btn-ghost danger" onclick="clearConfig()"><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M9 5V3h6v2M7 5l1 16h8l1-16"/></svg>重置配置</button>
+    </div>
+    <div class="acts-opt">
+      <label class="check"><input type="checkbox" id="keep_awake" checked> 防休眠</label>
+      <label class="check"><input type="checkbox" id="auto_shutdown"> 自动关机</label>
+      <label class="check"><input type="checkbox" id="notify" checked> 完成通知</label>
+    </div>
+  </div>
+  <div class="hint">防休眠：任务运行期间系统不休眠（可正常息屏），独立于自动关机。自动关机：任务成功后 60 秒内关机（界面可取消）。</div>
+  <div id="err"></div>
+  <div id="error_panel" style="display:none">
+    <div class="ep-head"><span class="ep-cat" id="ep_cat"></span></div>
+    <div class="ep-guide" id="ep_guide"></div>
+    <div class="ep-llm" id="ep_llm"></div>
+  </div>
+  </section>
+
+  <section id="sec_progress">
+    <h2 class="sec-title"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg>实时进度</h2>
+    <div id="waiting_banner" style="display:none">
+      <span class="spin"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg></span>
+      <span id="waiting_txt"></span>
+    </div>
+    <!-- 线性流程：抓取 → 清洗统计 → LLM 总结 -->
+    <div class="steps">
+      <div class="step wait" id="st_scrape">
+        <div class="step-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 12h5M13 12h7M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="11" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg></div>
+        <div class="step-label">抓取推文</div>
+        <div class="step-state" id="st_scrape_state"></div>
+      </div>
+      <div class="step-arrow">→</div>
+      <div class="step wait" id="st_process">
+        <div class="step-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 10h16M4 15h16M4 20h16"/><path d="M8 3v4M12 8v4M16 13v4"/></svg></div>
+        <div class="step-label">清洗统计</div>
+        <div class="step-state" id="st_process_state"></div>
+      </div>
+      <div class="step-arrow">→</div>
+      <div class="step wait" id="st_analyze">
+        <div class="step-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="12" cy="10" r="3"/><path d="M6.5 17.5c1.1-2.1 3.2-3.2 5.5-3.2s4.4 1.1 5.5 3.2"/></svg></div>
+        <div class="step-label">LLM 总结</div>
+        <div class="step-state" id="st_analyze_state"></div>
+      </div>
+    </div>
+    <!-- 整体进度图表 -->
+    <div class="overall">
+      <div class="track"><i id="p_overall"></i></div>
+      <span class="pct" id="p_pct">0%</span>
+    </div>
+    <div class="prow"><span class="k">任务</span><span class="v" id="p_task">—</span><span class="n" id="p_elapsed">—</span></div>
+    <div class="prow" id="p_archive_row" style="display:none"><span class="k">已保存</span><span class="v" id="p_archive">—</span></div>
+    <details id="progress_detail" open>
+      <summary><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 12h5M13 12h7M4 17h11M19 17h1"/></svg>阶段明细</summary>
+      <div class="prow"><span class="k">阶段</span><span class="v" id="p_stage">—</span><span class="n rem" id="p_remaining">—</span></div>
+      <div class="prow"><span class="k">详情</span><span class="v" id="p_detail">—</span></div>
+      <div class="prow"><span class="k">按月归档</span><span class="v"><div class="track"><i id="p_bar"></i></div></span><span class="n" id="p_months">0/0</span></div>
+      <div class="prow"><span class="k">抓取条数</span><span class="v" id="p_count">0</span><span class="n" id="p_month_count"></span></div>
+      <div class="prow"><span class="k">清洗</span><span class="v" id="p_clean">—</span></div>
+      <div class="prow"><span class="k">LLM 分析</span><span class="v"><div class="track"><i id="p_llm"></i></div></span><span class="n" id="p_batch">0/0</span></div>
+      <div class="prow"><span class="k">电源</span><span class="v" id="p_power">—</span></div>
+      <div class="prow" id="p_shutdown_row" style="display:none"><span class="k">关机</span><span class="v" id="p_shutdown">—</span><span class="n"><button id="btn_cancel_shutdown" class="btn-ghost" onclick="cancelShutdown()">取消关机</button></span></div>
+    </details>
+  </section>
+
+  <section>
+    <h2 class="sec-title"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l2.5 2L7 13M12 13h5"/></svg>事件日志</h2>
+    <div style="display:flex;justify-content:flex-end;margin:-6px 0 8px">
+      <button class="chip" onclick="exportLog()" title="把事件日志与任务信息导出为 txt">导出日志</button>
+    </div>
+    <div id="event_log" class="muted">暂无事件</div>
+  </section>
+
+  <section>
+    <h2 class="sec-title"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>统计概览</h2>
+    <div id="stats_empty" class="empty-state">
+      <svg class="es" viewBox="0 0 220 120" aria-hidden="true">
+        <rect class="f" x="22" y="68" width="24" height="28" rx="3"/>
+        <rect class="f" x="60" y="48" width="24" height="48" rx="3"/>
+        <rect class="hi" x="98" y="26" width="24" height="70" rx="3"/>
+        <rect class="f" x="136" y="54" width="24" height="42" rx="3"/>
+        <path d="M20 96h180"/>
+        <path d="M180 18l2.4 4.8 4.8 2.4-4.8 2.4-2.4 4.8-2.4-4.8-4.8-2.4 4.8-2.4z"/>
+      </svg>
+      <p>运行任务后展示统计概览<br>（推文数 · 互动量 · 语言分布等）</p>
+    </div>
+    <div id="stats" class="stat-grid" style="display:none"></div>
+  </section>
+
+  <section>
+    <h2 class="sec-title"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="12" cy="10" r="3"/><path d="M6.5 17.5c1.1-2.1 3.2-3.2 5.5-3.2s4.4 1.1 5.5 3.2"/></svg>用户画像（LLM）</h2>
+    <div class="actions" id="result_actions" style="margin-top:0;padding-top:0;border-top:none">
+      <button id="dl_csv" class="btn-ghost" onclick="downloadCsv()" disabled><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M7 10l5 5 5-5M4 20h16"/></svg>下载清洗 CSV</button>
+      <button id="dl_md" class="btn-ghost" onclick="downloadMd()" disabled><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M7 10l5 5 5-5M4 20h16"/></svg>下载画像 MD</button>
+      <button id="dl_digest" class="btn-ghost" onclick="downloadDigest()" disabled><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M7 10l5 5 5-5M4 20h16"/></svg>下载简约整理</button>
+      <button id="dl_zip" class="btn-ghost" onclick="downloadZip()" disabled title="打包全部结果（CSV+画像+整理+JSON）为一个 zip"><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 12h18M3 17h18"/><path d="M9 3l3 3 3-3"/></svg>打包下载</button>
+      <button id="btn_copy_profile" class="btn-ghost" onclick="copyProfile()" disabled title="复制画像 markdown 全文到剪贴板">复制画像</button>
+    </div>
+    <div id="profile_empty" class="empty-state">
+      <svg class="es" viewBox="0 0 220 140" aria-hidden="true">
+        <rect class="f" x="42" y="18" width="136" height="104" rx="10"/>
+        <circle class="hi" cx="110" cy="60" r="22"/>
+        <path d="M72 110c8-16 22-24 38-24s30 8 38 24"/>
+        <path d="M70 30h80M70 42h52"/>
+        <path d="M180 20l2.6 5.2 5.2 2.6-5.2 2.6-2.6 5.2-2.6-5.2-5.2-2.6 5.2-2.6z"/>
+        <path d="M30 32l2 4 4 2-4 2-2 4-2-4-4-2 4-2z"/>
+      </svg>
+      <p>运行后由 LLM 按所选预设生成用户画像<br>（身份 · 内容 · 风格 · 关系等）</p>
+    </div>
+    <div id="profile" class="muted" style="display:none">运行后显示</div>
+  </section>
+
+  <details>
+    <summary><svg class="ico-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8.5" cy="15" r="4.5"/><path d="M12 11.5L20.5 3M16 7l3 3M13.5 9.5L17 13"/></svg>如何获取 Cookie（auth_token / ct0）？</summary>
+    <ol>
+      <li>打开 https://x.com 并登录你的<strong>小号</strong>（不要用主号，有风控风险）。</li>
+      <li>F12 → Application → Cookies → 选择 https://x.com。</li>
+      <li>复制 <code>auth_token</code> 与 <code>ct0</code> 的 Value。</li>
+      <li>填进上方 Cookies 输入框，每行一个小号（可加 |proxy= 指定独立 IP）。</li>
+      <li>小号越多越快（多账号自动轮换突破限流）。</li>
+    </ol>
+  </details>
+
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let resultData=null;
+let savedCookies=false;   // 当前配置已保存小号 Cookie（表单未回填明文，可经 use_saved_cookies 复用）
+let savedKey=false;       // 当前配置已保存 LLM API Key（可经 use_saved_key 复用）
+// 亮/暗主题：从 localStorage 恢复上次选择
+(function(){try{const t=localStorage.getItem("tpg_theme");if(t==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}})();
+
+function collectCfg(){
+  return {
+    action:$("action").value,
+    profile:$("cfg_profile").value||"default",
+    mode:$("mode").value,
+    preset:$("preset").value,
+    target:$("target").value.trim(),
+    start_date:$("start_date").value||null,
+    end_date:$("end_date").value||null,
+    force_recent:$("force_recent").checked,
+    cookies:$("cookies").value,
+    use_saved_cookies:!$("cookies").value.trim()&&savedCookies,
+    proxy:$("proxy").value.trim()||null,
+    delay:(Number.isFinite(parseFloat($("delay").value))?parseFloat($("delay").value):2),
+    llm_base_url:$("llm_base_url").value.trim(),
+    llm_api_key:$("llm_api_key").value.trim(),
+    use_saved_key:!$("llm_api_key").value.trim()&&savedKey,
+    llm_model:$("llm_model").value.trim(),
+    keep_awake:$("keep_awake").checked,
+    auto_shutdown:$("auto_shutdown").checked,
+    notify:$("notify").checked,
+  };
+}
+async function saveConfig(){
+  const cfg=collectCfg();
+  const name=cfg.profile==="default"?"":cfg.profile;
+  try{
+    const r=await fetch("/api/save_config",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign(cfg,{profile:name}))});
+    const j=await r.json();
+    $("err").textContent=j.error?("保存配置失败："+j.error):("✓ 配置已保存"+(name?("到 "+name):"到 user_config.json"));
+  }catch(e){$("err").textContent="保存配置失败："+e;}
+}
+async function clearConfig(){
+  const name=$("cfg_profile").value||"default";
+  const label=name==="default"?"默认配置":name;
+  if(!confirm("确定清除配置文件「"+label+"」？（当前表单不变）"))return;
+  try{
+    const r=await fetch("/api/clear_config",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:name==="default"?"":name})});
+    const j=await r.json();
+    if(j.error){$("err").textContent="清除配置失败："+j.error;}
+    else{
+      $("err").textContent="已清除配置文件「"+label+"」";
+      $("llm_api_key").value=""; $("llm_api_key").placeholder="sk-...";
+      savedCookies=false; savedKey=false;
+      if(!$("cookies").value.trim())$("cookie_count").textContent="";
+    }
+  }catch(e){$("err").textContent="清除配置失败："+e;}
+}
+// 多配置文件管理：另存为新配置 / 重命名 / 删除
+async function saveAsConfig(){
+  const cfg=collectCfg();
+  const src=cfg.profile==="default"?"":cfg.profile;
+  const name=prompt("输入新配置名称（1-32 位中英文/数字/下划线/短横线）：");
+  if(name===null)return;
+  const n=name.trim();
+  if(!n||!/^[A-Za-z0-9_\-\u4e00-\u9fff]{1,32}$/.test(n)){
+    $("err").textContent="配置名称无效（仅中英文/数字/下划线/短横线，1-32 位）"; return;
+  }
+  try{
+    const r=await fetch("/api/save_config_as",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign(cfg,{profile:src,new_name:n}))});
+    const j=await r.json();
+    if(j.error){$("err").textContent="另存配置失败："+j.error;return;}
+    await refreshConfigs();
+    const sel=$("cfg_profile"); if([...sel.options].some(o=>o.value===n))sel.value=n;
+    loadProfileConfig();
+    $("err").textContent="✓ 已另存为新配置「"+n+"」（已切换）";
+  }catch(e){$("err").textContent="另存配置失败："+e;}
+}
+async function renameConfig(){
+  const cur=$("cfg_profile").value||"default";
+  if(cur==="default"){ $("err").textContent="默认配置不可重命名，可用「另存为…」新建"; return; }
+  const name=prompt("输入新的配置名称：",cur);
+  if(name===null)return;
+  const n=name.trim();
+  if(!n||!/^[A-Za-z0-9_\-\u4e00-\u9fff]{1,32}$/.test(n)){
+    $("err").textContent="配置名称无效（仅中英文/数字/下划线/短横线，1-32 位）"; return;
+  }
+  if(n===cur)return;
+  try{
+    const r=await fetch("/api/rename_config",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:cur,new_name:n})});
+    const j=await r.json();
+    if(j.error){$("err").textContent="重命名失败："+j.error;return;}
+    await refreshConfigs();
+    const sel=$("cfg_profile"); if([...sel.options].some(o=>o.value===n))sel.value=n;
+    loadProfileConfig();
+    $("err").textContent="✓ 配置已重命名为「"+n+"」";
+  }catch(e){$("err").textContent="重命名失败："+e;}
+}
+async function deleteConfig(){
+  const cur=$("cfg_profile").value||"default";
+  if(cur==="default"){ $("err").textContent="默认配置不可删除"; return; }
+  if(!confirm("确定删除配置「"+cur+"」？删除后不可恢复。"))return;
+  try{
+    const r=await fetch("/api/clear_config",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:cur})});
+    const j=await r.json();
+    if(j.error){$("err").textContent="删除失败："+j.error;return;}
+    $("cfg_profile").value="default";
+    $("llm_api_key").value=""; $("llm_api_key").placeholder="sk-...";
+    savedCookies=false; savedKey=false;
+    await refreshConfigs();
+    loadProfileConfig();
+    $("err").textContent="✓ 已删除配置「"+cur+"」（已切回默认）";
+  }catch(e){$("err").textContent="删除失败："+e;}
+}
+// 输出目录：选择 / 恢复默认 / 打开目录
+async function pickOutputDir(){
+  try{
+    const r=await fetch("/api/pick_dir",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify({kind:"output"})});
+    const j=await r.json();
+    if(j.error){$("err").textContent=j.error;return;}
+    if(j.cancelled)return;
+    await applyOutputDir(j.path);
+  }catch(e){$("err").textContent="选择目录失败："+e;}
+}
+async function applyOutputDir(p){
+  const r=await fetch("/api/set_output_dir",{method:"POST",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify({output_dir:p})});
+  const j=await r.json();
+  if(j.error){$("err").textContent=j.error;return;}
+  $("output_dir").value=j.output_dir||"";
+  updateOutDirHint();
+  $("err").textContent=j.output_dir?("✓ 输出目录已设为 "+j.output_dir):"✓ 已恢复默认输出目录";
+}
+async function resetOutputDir(){
+  await applyOutputDir("");
+}
+function updateOutDirHint(){
+  const v=$("output_dir").value;
+  $("outdir_hint").textContent=v?("当前：输出到 "+v):"当前：默认（数据目录/output）";
+}
+function openDataDir(kind){ window.open("/api/open_dir?d="+kind,"_blank"); }
+async function start(){
+  const btn=$("btn_start");
+  if(btn.disabled)return;              // 防连点重复提交
+  $("err").textContent="";
+  const cfg=collectCfg();
+  // 导入操作有专门的导入按钮，点开始直接引导
+  if(cfg.action==="import"){
+    $("err").textContent="导入操作：请点击下方「导入并清洗」选择 CSV 文件";
+    $("import_files").focus();
+    return;
+  }
+  if(!cfg.target){$("err").textContent="请填写目标对象";$("target").focus();return;}
+  if(cfg.action==="analyze"){
+    if(!cfg.llm_api_key&&!cfg.use_saved_key){$("err").textContent="「仅 LLM 总结」需要填写 LLM API Key";$("llm_api_key").focus();return;}
+  }else if(cfg.action==="full"||cfg.action==="scrape"){
+    if(!cfg.cookies&&!cfg.use_saved_cookies){$("err").textContent="请填写至少一个小号的 cookie（或使用已保存的 Cookie）";$("cookies").focus();return;}
+  }
+  btn.disabled=true;                   // 立即禁用，避免 poll 确认前双击
+  let j;
+  try{
+    const r=await fetch("/api/start",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
+    j=await r.json();
+  }catch(e){btn.disabled=false;$("err").textContent="请求失败："+e;return;}
+  if(j.error){btn.disabled=false;$("err").textContent=j.error;}
+  else{
+    poll();
+    // 开始后自动滚动到进度区，让用户看到实时进度
+    const sec=$("sec_progress");
+    if(sec)sec.scrollIntoView({behavior:"smooth",block:"start"});
+  }
+}
+async function stop(){
+  const b=$("btn_stop");
+  b.disabled=true; $("stop_txt").textContent="正在停止…";
+  try{
+    const r=await fetch("/api/stop",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+    const j=await r.json();
+    if(j.error){$("err").textContent="停止失败："+j.error;b.disabled=false;$("stop_txt").textContent="停止";}
+  }catch(e){b.disabled=false;$("stop_txt").textContent="停止";}
+}
+async function cancelShutdown(){
+  await fetch("/api/shutdown_cancel",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+}
+function fmtElapsed(iso){
+  if(!iso)return "—";
+  const diff=Math.max(0,Math.floor((Date.now()-new Date(iso).getTime())/1000));
+  const h=String(Math.floor(diff/3600)).padStart(2,"0");
+  const m=String(Math.floor(diff%3600/60)).padStart(2,"0");
+  const s=String(diff%60).padStart(2,"0");
+  return h+":"+m+":"+s;
+}
+function fmtDur(sec){
+  sec=Math.max(0,Math.round(sec));
+  if(!isFinite(sec))return "";
+  const m=Math.floor(sec/60), s=sec%60;
+  if(m>=60){const h=Math.floor(m/60);return h+" 时 "+(m%60)+" 分";}
+  return m? (m+" 分 "+s+" 秒") : (s+" 秒");
+}
+function escapeHtml(t){return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
+function countAccounts(t){
+  if(!t)return 0;
+  let n=0;
+  for(const raw of String(t).split("\n")){
+    const line=raw.trim();
+    if(!line||line.startsWith("#"))continue;
+    if(/auth_token=([^;\s]+)/i.test(line)&&/ct0=([^;\s]+)/i.test(line)){n++;continue;}
+    // 直接两个值：token值 ct0值（首段不含 =）
+    const parts=line.replace(/^cookie\s*[:：]\s*/i,"").split(/[\s,，;；|]+/).filter(Boolean);
+    if(parts.length>=2&&!parts[0].includes("="))n++;
+  }
+  return n;
+}
+function updateCookieCount(){
+  const n=countAccounts($("cookies").value);
+  $("cookie_count").textContent=n?("✓ 已识别 "+n+" 个小号"):"";
+}
+// 画像预设联动说明
+const PRESET_DESC={
+  acg:"ACG 预设侧重：身份定位、作品与创作产出、创作风格、职业活动、业界关系等。",
+  general:"通用预设侧重：活跃概况、主题领域、语言风格、互动影响力、人物总结。",
+  brand:"品牌预设侧重：业务定位、产品动态、宣发营销、客服运营、品牌调性。",
+  creator:"创作者预设侧重：人设、内容矩阵、企划联动、粉丝经济、运营成长。",
+  expert:"专家预设侧重：专业领域、核心观点、知识输出、影响力与互动。",
+};
+function presetChanged(){
+  $("preset_hint").textContent=PRESET_DESC[$("preset").value]||"";
+}
+// 提取模式联动：placeholder 与仅用户模式有效的选项
+function modeChanged(){
+  const m=$("mode").value;
+  $("target").placeholder = m==="user" ? "用户模式填用户名（如 Zn_Cien）" : "关键词模式填词/标签";
+  const fc=$("force_recent").closest("label");
+  if(fc)fc.style.display = m==="user" ? "" : "none";   // 强制重抓最近推文仅用户模式有意义
+}
+// 操作选择联动
+const ACTION_HINT={
+  full:"完整流程：抓取 → 清洗 → LLM 画像；不填 API Key 时自动跳过画像，仅生成统计与简约整理。",
+  scrape:"仅抓取：抓取 → 清洗统计 → 简约整理，不调用 LLM；结果可通过下载按钮导出。",
+  import:"导入数据：上传已有 CSV 后自动清洗去重、生成统计与简约整理，无需 Cookie 与 API Key。",
+  analyze:"仅 LLM 总结：在已有数据（已抓取 / 已导入）上生成画像，需要 API Key。",
+};
+function actionChanged(){
+  const a=$("action").value;
+  $("action_hint").textContent=ACTION_HINT[a]||"";
+  $("import_row").style.display=a==="import"?"":"none";
+  const sb=$("btn_start");
+  sb.style.display=a==="import"?"none":"";
+  $("btn_start_txt").textContent=
+    a==="analyze"?"开始 LLM 总结":(a==="scrape"?"开始抓取":"开始生成");
+}
+// 日期快捷选择
+function quickDate(kind){
+  const d=new Date(), p=n=>String(n).padStart(2,"0");
+  const today=d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
+  $("end_date").value=today;
+  if(kind==="1y"){$("start_date").value=(d.getFullYear()-1)+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());}
+  else if(kind==="3y"){$("start_date").value=(d.getFullYear()-3)+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());}
+  else if(kind==="5y"){$("start_date").value=(d.getFullYear()-5)+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());}
+  else if(kind==="all"){$("start_date").value="";}
+  else{$("start_date").value="";$("end_date").value="";}
+  updateDateHint();
+}
+function updateDateHint(){
+  const s=$("start_date").value, e=$("end_date").value;
+  let t="起始日期留空自动选取（用户模式=账号创建月起，关键词=2010-01-01）；结束日期留空=今天。";
+  if(s&&e)t="当前范围："+s+" ~ "+e+"（含当天）。";
+  else if(s)t="起始："+s+"；结束留空=今天。";
+  else if(e)t="起始自动选取 ~ "+e+"。";
+  $("date_hint").textContent=t;
+}
+function openDocs(){ window.open("/docs","_blank"); }
+// 限流状态检测
+async function checkRateLimit(){
+  const btn=$("btn_ratelimit"), res=$("ratelimit_result");
+  const useSaved=!$("cookies").value.trim()&&savedCookies;
+  if(!$("cookies").value.trim()&&!useSaved){res.textContent="请先填写 cookie（或使用已保存的 Cookie）";res.style.color="";return;}
+  btn.disabled=true; $("ratelimit_txt").textContent="检测中…";
+  // 醒目的等待指示：spinner + 已等待秒数（每 1s 刷新），避免看起来像卡死
+  const t0=Date.now();
+  res.style.color="";
+  res.innerHTML='<span class="rl-spin"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg></span>正在检测限流状态…已等待 <b id="rl_sec">0</b> 秒（最多约 15 秒）';
+  const timer=setInterval(()=>{const el=$("rl_sec");if(el)el.textContent=Math.floor((Date.now()-t0)/1000);},1000);
+  try{
+    const r=await fetch("/api/ratelimit",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({cookies:$("cookies").value,use_saved_cookies:useSaved,
+        profile:$("cfg_profile").value||"default",proxy:$("proxy").value.trim()||null})});
+    const j=await r.json();
+    if(j.error){res.innerHTML="";res.textContent="检测失败："+j.error;res.style.color="";}
+    else{res.innerHTML="";res.textContent=(j.ok?"✓ 正常：":"✗ ")+j.message;
+      res.style.color=j.ok?"#7dd87d":"#ff9b9b";}
+  }catch(e){res.innerHTML="";res.textContent="检测失败："+e;res.style.color="";}
+  clearInterval(timer);
+  btn.disabled=false; $("ratelimit_txt").textContent="检测限流状态";
+}
+// 导入已有 CSV
+async function doImport(){
+  const files=$("import_files").files;
+  if(!files.length){$("err").textContent="请选择要导入的 CSV 文件";return;}
+  const cfg=collectCfg();
+  if(!cfg.target){$("err").textContent="请填写目标对象";return;}
+  const out={};
+  for(const f of files){out[f.name]=await f.text();}
+  cfg.action="import"; cfg.files=out;
+  $("err").textContent="";
+  const btn=$("btn_import"); btn.disabled=true;
+  try{
+    const r=await fetch("/api/import",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
+    const j=await r.json();
+    if(j.error){$("err").textContent=j.error;btn.disabled=false;}
+    else{
+      $("import_files").value="";   // 清空选择，便于重复导入
+      poll();
+    }
+  }catch(e){$("err").textContent="导入失败："+e;btn.disabled=false;}
+}
+// 自动识别可选模型：从当前 Base URL + Key 拉取 /models 填充输入建议列表
+async function refreshModels(){
+  const base=$("llm_base_url").value.trim();
+  const key=$("llm_api_key").value.trim();
+  const useSaved=!key&&savedKey;
+  const res=$("err");
+  if(!base){res.textContent="请先填写 LLM API Base URL";return;}
+  if(!key&&!useSaved){res.textContent="请填写 LLM API Key（或使用已保存的 Key）";return;}
+  const btn=$("btn_refresh_models"), oldTxt=btn.textContent;
+  btn.disabled=true; btn.textContent="获取中…";
+  try{
+    const r=await fetch("/api/models",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({base_url:base,llm_api_key:key,use_saved_key:useSaved,
+        profile:$("cfg_profile").value||"default"})});
+    const j=await r.json();
+    if(j.error){res.textContent="获取模型失败："+j.error;return;}
+    const dl=$("llm_model_list");
+    dl.innerHTML=j.models.map(m=>"<option value='"+escapeHtml(m)+"'>").join("");
+    if(!$("llm_model").value.trim()&&j.models.length)$("llm_model").value=j.models[0];
+    res.textContent="✓ 已识别 "+j.models.length+" 个模型（"+j.base_url+"）";
+  }catch(e){res.textContent="获取模型失败："+e;}
+  finally{btn.disabled=false; btn.textContent=oldTxt;}
+}
+// 快速测试抓取：抓取前验证 Cookie/代理/目标（后端只取前 5 条）
+async function testScrape(){
+  const cfg=collectCfg();
+  const res=$("err");
+  if(!cfg.target){res.textContent="请先填写目标对象";return;}
+  if(!cfg.cookies&&!cfg.use_saved_cookies){res.textContent="请填写至少一个小号的 cookie（或使用已保存的 Cookie）";return;}
+  const btn=$("btn_test_scrape"), old=btn.innerHTML;
+  btn.disabled=true; btn.textContent="测试中…";
+  try{
+    const r=await fetch("/api/test_scrape",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
+    const j=await r.json();
+    if(j.error){res.textContent="测试失败："+j.error;return;}
+    if(j.ok){
+      res.style.color="#7dd87d";
+      res.innerHTML="✓ "+escapeHtml(j.message)+(j.samples&&j.samples.length
+        ?'<div class="hint" style="margin-top:6px;color:var(--fg-dim)">'+j.samples.map(s=>"· "+escapeHtml(s.date||"")+" "+escapeHtml(s.content||"")).join("<br>")+"</div>":"");
+    }else{
+      res.style.color=""; res.textContent="✗ "+j.message;
+    }
+  }catch(e){res.textContent="测试失败："+e;}
+  finally{btn.disabled=false; btn.innerHTML=old;}
+}
+// LLM 连通性测试：发一条最小请求验证 Base URL/Key/模型
+async function testLLM(){
+  const base=$("llm_base_url").value.trim();
+  const model=$("llm_model").value.trim();
+  const key=$("llm_api_key").value.trim();
+  const useSaved=!key&&savedKey;
+  const res=$("err");
+  if(!base){res.textContent="请先填写 LLM API Base URL";return;}
+  if(!model){res.textContent="请填写模型名";return;}
+  if(!key&&!useSaved){res.textContent="请填写 LLM API Key（或使用已保存的 Key）";return;}
+  const btn=$("btn_test_llm"), old=btn.innerHTML;
+  btn.disabled=true; btn.textContent="测试中…";
+  try{
+    const r=await fetch("/api/test_llm",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({base_url:base,llm_api_key:key,use_saved_key:useSaved,
+        model:model,profile:$("cfg_profile").value||"default"})});
+    const j=await r.json();
+    if(j.error){res.textContent="LLM 测试失败："+j.error;return;}
+    res.style.color="#7dd87d";
+    res.textContent="✓ LLM 连通正常（"+model+"）："+j.reply;
+  }catch(e){res.textContent="LLM 测试失败："+e;}
+  finally{btn.disabled=false; btn.innerHTML=old;}
+}
+// 逐个账号批量预检 Cookie 有效性
+async function checkAllCookies(){
+  const cfg=collectCfg();
+  const res=$("cookie_check_result");
+  if(!cfg.cookies&&!cfg.use_saved_cookies){res.textContent="请填写 cookie（或使用已保存的 Cookie）";return;}
+  const btn=$("btn_check_cookies"), old=btn.innerHTML;
+  btn.disabled=true; btn.textContent="检查中…";
+  res.style.color="";
+  res.innerHTML='<span class="rl-spin"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg></span>逐个账号检查中（每个约 5~15 秒）…';
+  try{
+    const r=await fetch("/api/check_cookies",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
+    const j=await r.json();
+    if(j.error){res.textContent="检查失败："+j.error;return;}
+    res.innerHTML="";
+    if(j.results&&j.results.length){
+      res.innerHTML=j.results.map(x=>'<div style="margin-top:4px">账号'+x.index+'：<b style="color:'+(x.ok?"#7dd87d":"#ff9b9b")+'">'+(x.ok?"✓ 有效":"✗ 异常")+'</b> <span style="color:var(--fg-faint);font-size:11px">'+escapeHtml(x.message)+'</span></div>').join("")+
+        '<div style="margin-top:6px;font-weight:700">'+j.good+' / '+j.total+' 个有效</div>';
+    }else{
+      res.textContent=j.message||"检查完成";
+    }
+  }catch(e){res.textContent="检查失败："+e;}
+  finally{btn.disabled=false; btn.innerHTML=old;}
+}
+// 打包下载全部结果（zip）
+function downloadZip(){ if(resultData) location.href="/dl?f=zip"; }
+// 一键复制画像到剪贴板
+async function copyProfile(){
+  if(!resultData||!resultData.profile){return;}
+  try{
+    const r=await fetch("/dl?f=md");
+    const txt=await r.text();
+    try{await navigator.clipboard.writeText(txt);}
+    catch(e){
+      const ta=document.createElement("textarea");
+      ta.value=resultData.profile;
+      document.body.appendChild(ta); ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    $("err").textContent="✓ 画像已复制到剪贴板";
+  }catch(e){$("err").textContent="复制失败："+e;}
+}
+// 事件日志导出（txt）
+async function exportLog(){
+  let s={};
+  try{const r=await fetch("/api/status?t="+Date.now()); s=await r.json();}catch(e){}
+  const lines=[];
+  lines.push("推特用户画像生成器 · 事件日志导出");
+  lines.push("导出时间: "+new Date().toLocaleString());
+  lines.push("状态: "+(s.status||"-")+" · 模式: "+(s.mode||"-")+" · 目标: "+(s.target||"-")+" · 操作: "+(s.action||"-"));
+  lines.push("开始: "+(s.started_at||"-")+" · 结束: "+(s.finished_at||"-"));
+  if(s.error)lines.push("错误: "+s.error);
+  if(s.error_info)lines.push("诊断: "+(s.error_info.title||"")+" · 分类: "+(s.error_info.category||""));
+  lines.push("");
+  lines.push("---- 事件 ----");
+  (s.events||[]).forEach(e=>lines.push("["+e.t+"] "+e.msg));
+  const blob=new Blob([lines.join("\n")],{type:"text/plain;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="事件日志_"+new Date().toISOString().replace(/[:T]/g,"-").slice(0,19)+".txt";
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},600);
+}
+// 最近使用目标：加载 + 点击回填
+async function loadRecent(){
+  try{
+    const r=await fetch("/api/recent?t="+Date.now()); const j=await r.json();
+    const arr=j.recent||[];
+    const row=$("recent_row");
+    if(!arr.length){row.style.display="none";return;}
+    row.style.display="";
+    row.innerHTML='<span class="hint" style="display:inline-block;margin:0 8px 0 0">最近使用：</span>'+
+      arr.map(e=>'<button class="chip" style="margin:2px" onclick="useRecent(this)" data-mode="'+escapeHtml(e.mode)+'" data-target="'+escapeHtml(e.target)+'" data-preset="'+escapeHtml(e.preset||'')+'">'+(e.mode==="keyword"?"#":"@")+escapeHtml(e.target)+' <span style="opacity:.6">'+escapeHtml(e.at||"")+'</span></button>').join("");
+  }catch(e){}
+}
+function useRecent(btn){
+  $("mode").value=btn.dataset.mode||"user";
+  $("target").value=btn.dataset.target||"";
+  if(btn.dataset.preset)$("preset").value=btn.dataset.preset;
+  modeChanged(); presetChanged(); actionChanged(); updateDateHint();
+  $("target").focus();
+}
+// 亮/暗主题切换
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute("data-theme")||"dark";
+  const next=cur==="dark"?"light":"dark";
+  document.documentElement.setAttribute("data-theme",next);
+  try{localStorage.setItem("tpg_theme",next);}catch(e){}
+}
+// 多配置文件：刷新列表 / 载入所选配置
+async function refreshConfigs(){
+  try{
+    const r=await fetch("/api/configs?t="+Date.now()); const j=await r.json();
+    const sel=$("cfg_profile"); const cur=sel.value||"default";
+    sel.innerHTML="<option value='default'>默认 (user_config.json)</option>"+
+      (j.configs||[]).filter(n=>n!=="default")
+        .map(n=>"<option value='"+escapeHtml(n)+"'>"+escapeHtml(n)+"</option>").join("");
+    if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+  }catch(e){}
+}
+async function loadProfileConfig(){
+  const name=$("cfg_profile").value||"default";
+  try{
+    const r=await fetch("/api/config?name="+encodeURIComponent(name)+"&t="+Date.now());
+    const j=await r.json(); const c=j.config||{};
+    $("llm_api_key").value=""; $("llm_api_key").placeholder="sk-...";
+    fillForm(c);
+  }catch(e){}
+}
+function fillForm(c){
+  if(!c)return;
+  if(c.mode)$("mode").value=c.mode;
+  if(c.preset)$("preset").value=c.preset;
+  if(c.target)$("target").value=c.target;
+  if(c.start_date)$("start_date").value=c.start_date;
+  if(c.end_date)$("end_date").value=c.end_date;
+  // cookies 掩码：已保存时提示、不回填明文；否则回填并刷新小号计数
+  if(c.cookies==="__SAVED_COOKIES__"){
+    savedCookies=true; $("cookies").value="";
+    $("cookie_count").textContent="✓ 已保存小号 Cookie（可直接开始；输入新值将覆盖）";
+  }else if(c.cookies){
+    savedCookies=false; $("cookies").value=c.cookies; updateCookieCount();
+  }else{
+    savedCookies=false;
+  }
+  if(c.proxy)$("proxy").value=c.proxy;
+  if(c.delay!==undefined&&c.delay!==null)$("delay").value=c.delay;
+  if(c.llm_base_url)$("llm_base_url").value=c.llm_base_url;
+  if(c.llm_model)$("llm_model").value=c.llm_model;
+  if(c.llm_api_key&&c.llm_api_key.endsWith("***")){
+    savedKey=true; $("llm_api_key").placeholder="已保存（重新输入可覆盖）";
+  }else{
+    savedKey=false;
+  }
+  if(c.force_recent!==undefined)$("force_recent").checked=!!c.force_recent;
+  if(c.keep_awake!==undefined)$("keep_awake").checked=!!c.keep_awake;
+  if(c.auto_shutdown!==undefined)$("auto_shutdown").checked=!!c.auto_shutdown;
+  if(c.notify!==undefined)$("notify").checked=!!c.notify;
+  modeChanged(); presetChanged(); actionChanged(); updateDateHint();
+}
+// 回车快捷启动（输入框内按 Enter 直接开始；Cookies 文本框内 Ctrl+Enter 提交）
+document.addEventListener("keydown",e=>{
+  const id=e.target&&e.target.id;
+  if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)&&id==="cookies"){e.preventDefault();start();return;}
+  if(e.key!=="Enter"||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(id==="output_dir"){e.preventDefault();applyOutputDir($("output_dir").value.trim());return;}
+  if(["target","proxy","delay","llm_base_url","llm_api_key","llm_model"].includes(id)){
+    e.preventDefault(); start();
+  }
+});
+function renderErrorInfo(ei){
+  const panel=$("error_panel");
+  if(ei){
+    panel.style.display="";
+    $("ep_cat").textContent=ei.title||"未知错误";
+    $("ep_guide").innerHTML=(ei.guide||[]).map(g=>"• "+escapeHtml(g)).join("<br>");
+    const llmEl=$("ep_llm");
+    if(ei.llm_advice){llmEl.style.display="";llmEl.textContent="🤖 LLM 诊断："+ei.llm_advice;}
+    else{llmEl.style.display="none";}
+  }else{
+    panel.style.display="none";
+  }
+}
+let lastEventsSig="";
+function renderEvents(events){
+  const el=$("event_log");
+  if(!events||!events.length){
+    if(lastEventsSig!=="empty"){el.textContent="暂无事件";lastEventsSig="empty";}
+    return;
+  }
+  const sig=events.slice(-100).map(e=>e.t+"|"+e.msg).join("\n");
+  if(sig===lastEventsSig)return;
+  lastEventsSig=sig;
+  el.innerHTML=events.slice(-100).map(e=>'<div><span class="t">'+escapeHtml(e.t)+'</span>'+escapeHtml(e.msg)+'</div>').join("");
+  el.scrollTop=el.scrollHeight;
+}
+function setRunning(on){
+  $("btn_start").disabled=on;
+  $("btn_import").disabled=on;
+  $("action").disabled=on;
+  $("cfg_profile").disabled=on;
+  $("btn_save_as").disabled=on;
+  $("btn_rename_cfg").disabled=on;
+  $("btn_del_cfg").disabled=on;
+  $("btn_refresh_cfgs").disabled=on;
+  $("btn_refresh_models").disabled=on;
+  $("btn_test_scrape").disabled=on;
+  $("btn_test_llm").disabled=on;
+  $("btn_check_cookies").disabled=on;
+  $("btn_pick_outdir").disabled=on;
+  $("btn_reset_outdir").disabled=on;
+  const b=$("status_badge");
+  b.className="badge "+(on?"running":"idle"); b.textContent=on?"运行中":"未运行";
+}
+// 线性流程步骤条：根据 stage/status/action 渲染 ①抓取 ②清洗 ③LLM 的状态
+function renderSteps(s){
+  const order=["scrape","process","analyze"];
+  const map={"scrape":"st_scrape","process":"st_process","analyze":"st_analyze"};
+  // 仅抓取/导入操作不生成 LLM 画像 → 第③步标为「跳过」
+  const skipLLM=(s.action==="scrape"||s.action==="import");
+  const st={scrape:{cls:"wait",txt:""},process:{cls:"wait",txt:""},analyze:{cls:"wait",txt:""}};
+  if(s.status==="done"){
+    order.forEach(k=>st[k]=k==="analyze"&&skipLLM?{cls:"skip",txt:"跳过"}:{cls:"done",txt:"完成"});
+  }else if(s.status==="error"){
+    const idx=order.indexOf(s.stage);
+    order.forEach((k,i)=>{
+      if(i<idx)st[k]={cls:"done",txt:"完成"};
+      else if(i===idx)st[k]={cls:"error",txt:"失败"};
+      else st[k]={cls:"wait",txt:""};
+    });
+    if(skipLLM)st.analyze={cls:"skip",txt:"跳过"};
+  }else if(s.running){
+    const idx=order.indexOf(s.stage); const cur=idx>=0?idx:0;
+    order.forEach((k,i)=>{
+      if(i<cur)st[k]={cls:"done",txt:"完成"};
+      else if(i===cur)st[k]={cls:"active",txt:"进行中"};
+      else st[k]={cls:"wait",txt:""};
+    });
+    if(skipLLM)st.analyze={cls:"skip",txt:"跳过"};
+  }
+  order.forEach(k=>{
+    const el=$(map[k]);
+    if(!el)return;
+    el.className="step "+st[k].cls;
+    const stEl=el.querySelector(".step-state");
+    if(stEl)stEl.textContent=st[k].txt;
+  });
+}
+let pollTimer=null;
+async function poll(){
+  if(pollTimer)clearTimeout(pollTimer);
+  try{
+    const r=await fetch("/api/status?t="+Date.now()); const s=await r.json();
+    setRunning(s.running);
+    // 线性流程步骤条 + 整体进度图表
+    renderSteps(s);
+    const pct=s.progress||0;
+    $("p_overall").style.width=pct+"%";
+    $("p_pct").textContent=pct+"%";
+    $("p_pct").className="pct"+(s.status==="done"?" done":"");
+    // 停止按钮状态：停止中禁用并显示"正在停止…"
+    const stopBtn=$("btn_stop");
+    if(s.running){
+      stopBtn.disabled=!!s.stopping;
+      $("stop_txt").textContent=s.stopping?"正在停止…":"停止";
+    }else{
+      stopBtn.disabled=true;
+      $("stop_txt").textContent="停止";
+    }
+    // 等待指示横幅（限流/请求间隔/LLM 响应等）
+    if(s.running&&s.waiting){
+      $("waiting_banner").style.display="";
+      $("waiting_txt").textContent=s.waiting_detail||"等待中…";
+    }else{
+      $("waiting_banner").style.display="none";
+    }
+    $("stage_txt").textContent=s.status==="done"?"（已完成）":s.status==="error"?"（出错）":(s.running&&s.waiting?"（等待中）":"");
+    if(s.error){$("err").textContent="错误："+s.error;}
+    else if(s.running){$("err").textContent="";}
+    const stageMap={scrape:"抓取推文",process:"清洗统计",analyze:"LLM 画像"};
+    $("p_stage").textContent=s.running?(stageMap[s.stage]||s.stage):"—";
+    $("p_detail").textContent=s.detail||"—";
+    $("p_task").textContent=(s.mode?s.mode+" 模式 · ":"")+(s.target||"—");
+    $("p_elapsed").textContent=fmtElapsed(s.started_at);
+    // 输出内容自动保存提示
+    if(s.status==="done"&&s.last_archive){
+      $("p_archive_row").style.display="";
+      $("p_archive").textContent="输出已自动保存到 "+s.last_archive;
+    }else{
+      $("p_archive_row").style.display="none";
+    }
+    $("p_power").textContent=s.running
+      ?("防休眠 "+(s.keep_awake?"已启用":"未启用"))
+      :"—";
+    const sc=s.scrape||{};
+    $("p_months").textContent=(sc.months_done||0)+"/"+(sc.months_total||0);
+    $("p_bar").style.width=sc.months_total?((sc.months_done||0)/sc.months_total*100)+"%":"0%";
+    $("p_count").textContent=sc.count||0;
+    let monthNote="";
+    if(sc.current_month){
+      monthNote="当月 "+((sc.month_count)||0)+" 条 · 完成 "+(sc.months_done||0)+"/"+(sc.months_total||0)+" 月";
+    }else if(sc.months_total){
+      monthNote="共 "+sc.months_total+" 个月待归档 · 完成 "+(sc.months_done||0);
+    }else if(s.stage==="scrape"&&s.running){
+      monthNote="最近推文抓取中（实时计数）";
+    }
+    $("p_month_count").textContent=monthNote;
+    const pc=s.process||{};
+    $("p_clean").textContent=pc.input_rows?("输入 "+pc.input_rows+" 条 · 去重 "+pc.dupes+" · 结果 "+(pc.rows||0)+" 条"):(pc.rows?("结果 "+pc.rows+" 条"):"—");
+    const an=s.analyze||{};
+    $("p_batch").textContent=(an.batch||0)+"/"+(an.total||0);
+    $("p_llm").style.width=an.total?((an.batch||0)/an.total*100)+"%":"0%";
+    // 剩余工作量 + 时间预估：按月归档/LLM 批次速率推算
+    let remaining="";
+    const elapsedSec=s.started_at?Math.max(0,(Date.now()-new Date(s.started_at).getTime())/1000):0;
+    if(s.stage==="scrape"&&sc.months_total){
+      const done=sc.months_done||0, rem=sc.months_total-done;
+      if(rem>0){
+        remaining="剩余 "+rem+" 个月";
+        if(done>0&&elapsedSec>5)remaining+=" · 预计 "+fmtDur(elapsedSec/done*rem);
+      }else remaining="归档完成";
+    }else if(s.stage==="analyze"&&an.total){
+      const done=an.batch||0, rem=an.total-done;
+      if(rem>0){
+        remaining="剩余 "+rem+" 批";
+        if(done>0&&elapsedSec>5)remaining+=" · 预计 "+fmtDur(elapsedSec/done*rem);
+      }else remaining="收尾中";
+    }else if(s.running&&s.progress>0&&s.progress<100&&elapsedSec>10){
+      remaining="预计 "+fmtDur(elapsedSec*(100-s.progress)/s.progress);
+    }
+    $("p_remaining").textContent=remaining;
+    if(s.auto_shutdown&&s.shutdown_in!=null){
+      $("p_shutdown_row").style.display="";
+      $("p_shutdown").textContent="任务已结束，约 "+(s.shutdown_remaining!=null?s.shutdown_remaining:s.shutdown_in)+" 秒后自动关机";
+    }else{
+      $("p_shutdown_row").style.display="none";
+    }
+    renderEvents(s.events||[]);
+    // 错误诊断面板仅在出错状态展示，避免任务重跑后残留旧错误提示
+    renderErrorInfo(s.status==="error"?s.error_info:null);
+    if(s.result_exists){
+      loadResult(s.started_at);   // 传入任务开始时间，过滤旧任务的过期结果
+    }else if(resultVisible||lastResultSig){
+      lastResultSig=""; showResultEmpty();
+    }
+  }catch(e){}
+  pollTimer=setTimeout(poll,2000);
+}
+let lastResultSig="";
+let resultVisible=false;
+function showResultEmpty(){
+  resultVisible=false;
+  $("stats_empty").style.display=""; $("stats").style.display="none";
+  $("profile_empty").style.display=""; $("profile").style.display="none";
+  $("dl_zip").disabled=true; $("btn_copy_profile").disabled=true;
+}
+function showResultData(){
+  $("stats_empty").style.display="none"; $("stats").style.display="";
+  $("profile_empty").style.display="none"; $("profile").style.display="";
+}
+async function loadResult(runningStartedAt){
+  try{
+  const r=await fetch("/api/result?t="+Date.now()); if(!r.ok)return;
+  const data=await r.json();
+  const gen=data.generated_at||"";
+  // 结果早于本次任务开始 → 属于旧任务结果，运行期间不展示（避免看到旧画像）
+  if(runningStartedAt && gen && new Date(gen).getTime() < new Date(runningStartedAt).getTime()){
+    if(lastResultSig!==""){lastResultSig="";showResultEmpty();}
+    return;
+  }
+  const sig=gen+"|"+((data.stats&&data.stats.total)||0);
+  if(sig===lastResultSig)return;
+  lastResultSig=sig; resultVisible=true;
+  resultData=data;
+  showResultData();
+  const st=resultData.stats||{};
+  const cards=[
+    ["推文总数",st.total??"—"],
+    ["点赞总量",st.sum_likes??"—"],
+    ["转发总量",st.sum_retweets??"—"],
+    ["回复总量",st.sum_replies??"—"],
+    ["平均长度",st.avg_len!=null?st.avg_len+"字":"—"],
+    ["是回复",st.is_reply??"—"],
+  ];
+  $("stats").innerHTML=cards.map(c=>'<div class="c"><div class="k">'+escapeHtml(c[0])+'</div><div class="v">'+escapeHtml(c[1])+'</div></div>').join("");
+  $("profile").innerHTML=resultData.profile?md(resultData.profile):'<div class="muted">本操作未生成 LLM 画像：可切换「仅 LLM 总结」在已有数据上生成（需 API Key）。</div>';
+  $("profile").classList.remove("muted");
+  $("dl_csv").disabled=false; $("dl_digest").disabled=false;
+  $("dl_md").disabled=!resultData.profile;
+  $("dl_zip").disabled=false;
+  $("btn_copy_profile").disabled=!resultData.profile;
+  }catch(e){}   // 网络抖动/服务重启时静默，等下一轮 poll 重试
+}
+function md(t){
+  return t
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/^### (.*)$/gm,"<h3>$1</h3>")
+    .replace(/^## (.*)$/gm,"<h2>$1</h2>")
+    .replace(/^# (.*)$/gm,"<h2>$1</h2>")
+    .replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
+    .replace(/^\s*[-*] (.*)$/gm,"• $1")
+    .replace(/\n/g,"<br>");
+}
+function downloadCsv(){ if(resultData&&resultData.files&&resultData.files.clean_csv) location.href="/dl?f=clean"; }
+function downloadMd(){ if(resultData&&resultData.files&&resultData.files.profile_md) location.href="/dl?f=md"; }
+function downloadDigest(){ if(resultData&&resultData.files&&resultData.files.digest_txt) location.href="/dl?f=digest"; }
+(async function init(){
+  $("cookies").addEventListener("input",updateCookieCount);
+  $("mode").addEventListener("change",modeChanged);
+  $("preset").addEventListener("change",presetChanged);
+  $("action").addEventListener("change",actionChanged);
+  $("start_date").addEventListener("change",updateDateHint);
+  $("end_date").addEventListener("change",updateDateHint);
+  $("cfg_profile").addEventListener("change",()=>{
+    $("llm_api_key").value=""; $("llm_api_key").placeholder="sk-...";
+    loadProfileConfig();
+  });
+  // Base URL / Key 变更后自动识别模型列表
+  $("llm_base_url").addEventListener("change",()=>{ if($("llm_base_url").value.trim()) refreshModels(); });
+  $("llm_api_key").addEventListener("change",()=>{ if($("llm_api_key").value.trim()||savedKey) refreshModels(); });
+  // 目标对象输入框回车直接开始
+  $("target").addEventListener("keydown",e=>{
+    if(e.key==="Enter"&&!$("btn_start").disabled&&$("action").value!=="import")start();
+  });
+  updateCookieCount();
+  try{
+    const r=await fetch("/api/config?t="+Date.now()); const j=await r.json();
+    fillForm(j.config||{});
+  }catch(e){}
+  // 数据目录 / 输出目录展示（隐私数据与获得的数据统一存放位置）
+  try{
+    const r=await fetch("/api/output_dir?t="+Date.now()); const j=await r.json();
+    $("data_dir").value=j.data_dir||"";
+    $("output_dir").value=j.output_dir||"";
+    updateOutDirHint();
+  }catch(e){}
+  await refreshConfigs();
+  loadRecent();
+  if(!$("end_date").value){
+    const d=new Date(); const p=n=>String(n).padStart(2,"0");
+    $("end_date").value=d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
+  }
+  updateDateHint(); actionChanged();
+  poll();
+})();
+</script>
+</body>
+</html>

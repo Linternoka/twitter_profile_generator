@@ -1,0 +1,7 @@
+# 推特用户画像生成器依赖（Python 3.10+）
+twscrape>=0.20.0
+pandas>=2.0
+httpx>=0.24
+# 打包（build_exe.bat）会显式收集以下传递依赖，源码运行时也需可用
+fake_useragent>=1.0
+beautifulsoup4>=4.11
